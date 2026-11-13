@@ -1,11 +1,11 @@
 name: autopost
 
-# 08:00, 13:00 and 20:00 Dubai time (UTC+4). GitHub can start scheduled runs a few minutes late.
+# Checks every 15 minutes, off the top of the hour (GitHub drops or delays on-the-hour schedules).
+# publish.py only posts an approved reel once its slot (08:00 / 13:00 / 20:00 Dubai) has passed,
+# one per run and never within 60 minutes of the last post, so frequent checks can't double-post.
 on:
   schedule:
-    - cron: '0 4 * * *'
-    - cron: '0 9 * * *'
-    - cron: '0 16 * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       command:
