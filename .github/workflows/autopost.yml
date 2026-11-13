@@ -1,0 +1,52 @@
+name: autopost
+
+# 08:00, 13:00 and 20:00 Dubai time (UTC+4). GitHub can start scheduled runs a few minutes late.
+on:
+  schedule:
+    - cron: '0 4 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+    inputs:
+      command:
+        description: '"run", or "dry-run EP07" to test without publishing'
+        default: run
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autopost
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      AUTOPOST_CLOUD: '1'
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      MEDIA_KEY: ${{ secrets.MEDIA_KEY }}
+      MEDIA_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      CMD: ${{ github.event.inputs.command || 'run' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unlock the queue
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in queue.json.enc -out queue.json -pass env:MEDIA_KEY
+          sha256sum queue.json > "$RUNNER_TEMP/q0"
+      - name: Post the next due reel
+        run: python3 publish.py $CMD
+      - name: Save the queue
+        if: always()
+        run: |
+          if [ -f queue.json ] && ! sha256sum --quiet -c "$RUNNER_TEMP/q0" 2>/dev/null; then
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in queue.json -out queue.json.enc -pass env:MEDIA_KEY
+            git config user.name autopost
+            git config user.email autopost@users.noreply.github.com
+            git add queue.json.enc
+            git commit -q -m "queue state $(date -u +%FT%TZ)"
+            git pull -q --rebase
+            git push -q
+          fi

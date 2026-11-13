@@ -1,0 +1,5 @@
+queue.json
+cache/
+autopost.log
+posted.log
+.lock
